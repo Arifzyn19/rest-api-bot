@@ -19,6 +19,7 @@
   "dependencies": {
     "@whiskeysockets/baileys": "latest",
     "chalk": "^5.3.0",
+    "chats-simsimi": "^0.1.0",
     "dotenv": "^16.3.1",
     "file-type": "latest",
     "fluent-ffmpeg": "^2.1.2",
