@@ -89,10 +89,86 @@ Copyright © 2024 ArifzynAPI
         break;
 
       case "ping":
-        const start = new Date();
-        await m.reply("Pong!");
-        const end = new Date();
-        m.reply(`Speed: ${end - start}ms`);
+        {
+          try {
+            const start = new Date();
+
+            const os = await import("os");
+            const cpuStat = await import("cpu-stat");
+            const si = await import("systeminformation");
+
+            const osType = os.type();
+            const osRelease = os.release();
+            const osArch = os.arch();
+            const nodeVersion = process.version;
+
+            const cpuModel = os.cpus()[0].model;
+            const cpuSpeed = os.cpus()[0].speed;
+            const cpuLoad = await new Promise((resolve, reject) => {
+              cpuStat.usagePercent((err, percent) => {
+                if (err) reject(err);
+                resolve(percent);
+              });
+            });
+            const cpuLoadAverage = os.loadavg();
+
+            const totalMemory = os.totalmem() / 1024 / 1024 / 1024; // GB
+            const freeMemory = os.freemem() / 1024 / 1024 / 1024; // GB
+            const usedMemory = totalMemory - freeMemory;
+
+            const diskInfo = await si.fsSize();
+            const totalStorage =
+              diskInfo.reduce((acc, disk) => acc + disk.size, 0) /
+              1024 /
+              1024 /
+              1024; // GB
+            const usedStorage =
+              diskInfo.reduce((acc, disk) => acc + disk.used, 0) /
+              1024 /
+              1024 /
+              1024; // GB
+            const freeStorage = totalStorage - usedStorage;
+
+            const networkInterfaces = os.networkInterfaces();
+            const ipAddress = networkInterfaces.eth0
+              ? networkInterfaces.eth0[0].address
+              : "Tidak diketahui";
+
+            const end = new Date();
+            const latency = (end - start) / 1000; // detik
+
+            const serverInfo = `
+</> Info </>
+- OS: ${osType} (${osRelease})
+- Arsitektur: ${osArch}
+- Node.js Version: ${nodeVersion}
+- IP Address: ${ipAddress}
+
+</> CPU </>
+- Model: ${cpuModel}
+- Speed: ${cpuSpeed} MHz
+- Load: ${cpuLoad.toFixed(2)}%
+- Load Average: ${cpuLoadAverage.map((load) => load.toFixed(2)).join(", ")}
+
+</> Memory </>
+- Total: ${totalMemory.toFixed(2)} GB
+- Used: ${usedMemory.toFixed(2)} GB
+- Free: ${freeMemory.toFixed(2)} GB
+
+</> Storage </>
+- Total: ${totalStorage.toFixed(1)} GB
+- Used: ${usedStorage.toFixed(1)} GB (${((usedStorage / totalStorage) * 100).toFixed(1)}%)
+- Free: ${freeStorage.toFixed(1)} GB (${((freeStorage / totalStorage) * 100).toFixed(1)}%)
+
+</> Ping </>
+- Latency: ${latency.toFixed(4)} seconds
+        `;
+
+            await m.reply(serverInfo);
+          } catch (err) {
+            await m.reply("Terjadi kesalahan saat mengambil informasi server.");
+          }
+        }
         break;
 
       case "echo":
