@@ -22,25 +22,6 @@ import Transaction from "./models/Transaction.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const extractCaseNames = (filePath) => {
-  try {
-    const fileContent = fs.readFileSync(filePath, "utf8");
-    const regex = /case\s+"([^"]+)":/g;
-    const caseNames = [];
-    let match;
-
-    while ((match = regex.exec(fileContent)) !== null) {
-      caseNames.push(match[1]);
-    }
-
-    return caseNames;
-  } catch (error) {
-    console.error("Error:", error.message);
-    return [];
-  }
-};
-
-// Perintah-case yang ada
 export default async function message(client, store, m) {
   try {
     // Handle quoted message and download media
@@ -73,20 +54,139 @@ export default async function message(client, store, m) {
       );
     }
 
+    const commands = {
+      main: ["menu", "ping", "echo", "info", "help"],
+      user: [
+        "cekuser",
+        "listusers",
+        "updateprofile",
+        "addpremium",
+        "addprem",
+        "removepremium",
+        "removeprem",
+        "checkpremium",
+        "checkprem",
+      ],
+      api: [
+        "cekapi",
+        "cekapikey",
+        "updateapi",
+        "updateapikey",
+        "delapi",
+        "delapikey",
+      ],
+      transaction: ["listtransactions", "deletetransaction"],
+      changelog: ["addchangelog", "listchangelogs"],
+      plugins: ["listplugins"],
+      stats: ["totalrequests", "requeststats"],
+    };
+
+    async function getRequestData() {
+      try {
+        const requestData = await Request.findOne()
+          .sort({ lastUpdated: -1 })
+          .exec();
+        if (!requestData) {
+          return { totalRequests: 0, todayRequests: 0 };
+        }
+        return {
+          totalRequests: requestData.totalRequests,
+          todayRequests: requestData.todayRequests,
+        };
+      } catch (error) {
+        console.error("Error fetching request data:", error);
+        return { totalRequests: 0, todayRequests: 0 };
+      }
+    }
+
     // Handle commands
     switch (isCommand ? m.command.toLowerCase() : false) {
       case "menu":
-        const filePath = path.resolve(__dirname, "Arifzyn.js");
-        const caseNames = extractCaseNames(filePath);
+        {
+          const os = await import("os");
+          const startTime = new Date();
+          const readMore = String.fromCharCode(8206).repeat(4001);
 
-        const sortedCaseNames = caseNames.sort((a, b) => a.localeCompare(b));
-        const botMenu = `</> *Menu Bot* </>
+          // Function to get runtime in a human-readable format
+          function getRuntime() {
+            const now = new Date();
+            const runtime = now - startTime;
+            const days = Math.floor(runtime / (1000 * 60 * 60 * 24));
+            const hours = Math.floor(
+              (runtime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
+            );
+            const minutes = Math.floor(
+              (runtime % (1000 * 60 * 60)) / (1000 * 60),
+            );
+            const seconds = Math.floor((runtime % (1000 * 60)) / 1000);
+            return `${days}D, ${hours}H, ${minutes}M, ${seconds}S`;
+          }
 
-${sortedCaseNames.map((name, index) => `${index + 1}. !${name}`).join("\n")}
+          // Function to get countdown to next midnight
+          function getResetCountdown() {
+            const now = new Date();
+            const nextMidnight = new Date(now.setHours(24, 0, 0, 0));
+            const timeRemaining = nextMidnight - now;
+            const hours = Math.floor(
+              (timeRemaining % (1000 * 3600 * 24)) / (1000 * 3600),
+            );
+            const minutes = Math.floor(
+              (timeRemaining % (1000 * 3600)) / (1000 * 60),
+            );
+            const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
+            return `${hours}h ${minutes}m ${seconds}s`;
+          }
 
-Copyright © 2024 ArifzynAPI
-  `.trim();
-        await m.reply(botMenu);
+          // Function to get request data from database
+          async function getRequestData() {
+            try {
+              const requestData = await Request.findOne()
+                .sort({ lastUpdated: -1 })
+                .exec();
+              return requestData
+                ? {
+                    totalRequests: requestData.totalRequests,
+                    todayRequests: requestData.todayRequests,
+                  }
+                : { totalRequests: 0, todayRequests: 0 };
+            } catch (error) {
+              console.error("Error fetching request data:", error);
+              return { totalRequests: 0, todayRequests: 0 };
+            }
+          }
+
+          const requestData = await getRequestData();
+          const runtime = getRuntime();
+          const serverUsage = `${(os.freemem() / (1024 * 1024)).toFixed(2)} MB`;
+          const features = "146"; // Update this with actual data if needed
+          const resetLimits = getResetCountdown();
+          const cpuSpeed = os.cpus()[0].speed;
+
+          let botMenu =
+            `Hai @${m.sender.split("@")[0]}, \n\n` +
+            `</> *Info API System* </>\n` +
+            `- Runtime : ${runtime}\n` +
+            `- Server Usage : ${serverUsage}\n` +
+            `- Request Today : ${requestData.todayRequests}\n` +
+            `- Total Requests : ${requestData.totalRequests}\n` +
+            `- Features : ${features}\n` +
+            `- Reset Limits : ${resetLimits}\n` +
+            `- CPU Speed : ${cpuSpeed} MHz\n\n` +
+            `${readMore}` +
+            `</> *Commands* </>\n`;
+
+          for (const [category, cmds] of Object.entries(commands)) {
+            botMenu += `- *${category.charAt(0).toUpperCase() + category.slice(1)} Commands* -\n`;
+            cmds.forEach((name, index) => {
+              botMenu += `${index + 1}. !${name}\n`;
+            });
+            botMenu += "\n";
+          }
+
+          botMenu += "Copyright © 2024 ArifzynAPI";
+
+          await m.reply(botMenu.trim(), { mentions: [m.sender] });
+        }
         break;
 
       case "ping":
