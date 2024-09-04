@@ -6,6 +6,7 @@ import { exec } from "child_process";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import moment from "moment-timezone";
 
 import * as Func from "./lib/function.js";
 import Color from "./lib/color.js";
@@ -269,29 +270,27 @@ Copyright © 2024 ArifzynAPI
         }
         break;
 
-      case "userinfo":
+      case "cekuser":
         {
           if (!m.text)
-            throw `[!] Masukkan apikey pengguna.\n\nContoh : ${m.prefix + m.command} API_KEY`;
+            throw `[!] Masukkan username pengguna.\n\nContoh : ${m.prefix + m.command} USER_NAME`;
 
           try {
-            const apikey = m.text.trim();
-            const user = await User.findOne({ apikey });
+            const username = m.text.trim();
+            const user = await User.findOne({ username });
 
-            if (!user) throw "Apikey tidak ditemukan.";
+            if (!user) throw "User tidak ditemukan.";
 
             // Format informasi pengguna
             const userInfo = `
 </> Info Pengguna </>
 
 - Nama: ${user.username}
-- Email: ${user.email}
 - Apikey: ${user.apikey.substring(0, 2) + "*".repeat(user.apikey.length - 2)}
 - Limit: ${user.limit}
 - Premium: ${user.premium ? "Ya" : "Tidak"}
 - Premium Time: ${new Date(user.premiumTime).toLocaleString()}
-- Profile: ${user.profile}
-- Nomor: ${user.number}
+- Nomor: ${user.number || "-"}
 - Verified: ${user.isVerified ? "Ya" : "Tidak"}
         `.trim();
 
@@ -321,24 +320,27 @@ Copyright © 2024 ArifzynAPI
         }
         break;
 
-      case "premiumstatus":
+      case "updateprofile":
         {
-          if (!m.text)
-            throw `[!] Masukkan apikey dan status premium.\n\nContoh : ${m.prefix + m.command} API_KEY STATUS (true/false)`;
-
           try {
-            const [apikey, status] = m.text.split(" ");
-            const user = await User.findOne({ apikey });
-            if (!user) throw "Apikey tidak ditemukan.";
+            const { username, newUsername, newNumber, newEmail } = args; // Ambil argumen yang relevan
 
-            user.premium = status.toLowerCase() === "true";
+            if (!username)
+              throw "Masukkan username pengguna yang profilnya akan diperbarui.";
+
+            const user = await User.findOne({ username: username.trim() });
+            if (!user)
+              throw `Pengguna dengan username ${username} tidak ditemukan.`;
+
+            if (newUsername) user.username = newUsername.trim();
+            if (newNumber) user.number = newNumber.trim();
+            if (newEmail) user.email = newEmail.trim();
+
             await user.save();
 
-            await m.reply(
-              `Status premium berhasil diperbarui menjadi ${status}`,
-            );
+            await m.reply(`Profil pengguna ${user.username} telah diperbarui.`);
           } catch (err) {
-            throw err.message || err;
+            await m.reply(err.message || err);
           }
         }
         break;
@@ -538,6 +540,108 @@ ${i + 1}. Tanggal: ${req.date.toDateString()}
         }
         break;
 
+      // premium
+      case "addpremium":
+      case "addprem":
+        {
+          try {
+            const days = m.args[0];
+            const username = m.args.slice(1).join(" ");
+
+            if (!days && !username)
+              throw `[!] Masukkan days dan username pengguna.\n\nContoh : ${m.prefix + m.command} 30 Arifzyn`;
+
+            if (!days || isNaN(days))
+              throw "Masukkan jumlah hari premium yang valid.";
+            if (!username)
+              throw "Masukkan username pengguna yang akan ditambahkan ke premium.";
+
+            const user = await User.findOne({ username: username.trim() });
+            if (!user)
+              throw `Pengguna dengan username ${username} tidak ditemukan.`;
+
+            const currentDate = Date.now();
+            const premiumUntil =
+              user.premiumTime && user.premiumTime > currentDate
+                ? user.premiumTime + days * 24 * 60 * 60 * 1000
+                : currentDate + days * 24 * 60 * 60 * 1000;
+
+            user.premium = true;
+            user.premiumTime = premiumUntil;
+            await user.save();
+
+            const formattedPremiumUntil = new Date(
+              user.premiumTime,
+            ).toLocaleString();
+            await m.reply(
+              `Pengguna ${user.username} telah ditambahkan ke premium selama ${days} hari. Premium berlaku hingga ${formattedPremiumUntil}.`,
+            );
+          } catch (err) {
+            await m.reply(err.message || err);
+          }
+        }
+        break;
+
+      case "removepremium":
+      case "removeprem":
+        {
+          try {
+            const { username } = m.args; // Ambil username dari argumen
+
+            if (!username)
+              throw "Masukkan username pengguna yang akan dihapus dari premium.";
+
+            const user = await User.findOne({ username: username.trim() });
+            if (!user)
+              throw `Pengguna dengan username ${username} tidak ditemukan.`;
+
+            user.premium = false;
+            user.premiumTime = 0; // Reset waktu premium
+            await user.save();
+
+            await m.reply(
+              `Pengguna ${user.username} telah dihapus dari premium.`,
+            );
+          } catch (err) {
+            await m.reply(err.message || err);
+          }
+        }
+        break;
+
+      case "checkpremium":
+      case "checkprem":
+        {
+          try {
+            const username = m.text; // Ambil username dari argumen
+
+            if (!username)
+              throw "Masukkan username pengguna yang akan dicek status premium-nya.";
+
+            const user = await User.findOne({ username: username.trim() });
+            if (!user)
+              throw `Pengguna dengan username ${username} tidak ditemukan.`;
+
+            if (!user.premium) {
+              await m.reply(
+                `Pengguna ${user.username} tidak memiliki status premium.`,
+              );
+            } else {
+              const premiumExpiryDate = moment(user.premiumTime).tz(
+                "Asia/Jakarta",
+              ); // Sesuaikan timezone jika diperlukan
+              const formattedExpiryDate = premiumExpiryDate.format(
+                "D MMMM YYYY [pukul] HH.mm",
+              );
+
+              await m.reply(
+                `Pengguna ${user.username} adalah premium.\nExpired: ${formattedExpiryDate}`,
+              );
+            }
+          } catch (err) {
+            await m.reply(err.message || err);
+          }
+        }
+        break;
       default:
         // eval
         if (
