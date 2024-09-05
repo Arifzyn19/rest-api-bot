@@ -103,89 +103,41 @@ export default async function message(client, store, m) {
     switch (isCommand ? m.command.toLowerCase() : false) {
       case "menu":
         {
-          const os = await import("os");
-          const startTime = new Date();
           const readMore = String.fromCharCode(8206).repeat(4001);
 
-          // Function to get runtime in a human-readable format
-          function getRuntime() {
-            const now = new Date();
-            const runtime = now - startTime;
-            const days = Math.floor(runtime / (1000 * 60 * 60 * 24));
-            const hours = Math.floor(
-              (runtime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60),
-            );
-            const minutes = Math.floor(
-              (runtime % (1000 * 60 * 60)) / (1000 * 60),
-            );
-            const seconds = Math.floor((runtime % (1000 * 60)) / 1000);
-            return `${days}D, ${hours}H, ${minutes}M, ${seconds}S`;
-          }
-
-          // Function to get countdown to next midnight
-          function getResetCountdown() {
-            const now = new Date();
-            const nextMidnight = new Date(now.setHours(24, 0, 0, 0));
-            const timeRemaining = nextMidnight - now;
-            const hours = Math.floor(
-              (timeRemaining % (1000 * 3600 * 24)) / (1000 * 3600),
-            );
-            const minutes = Math.floor(
-              (timeRemaining % (1000 * 3600)) / (1000 * 60),
-            );
-            const seconds = Math.floor((timeRemaining % (1000 * 60)) / 1000);
-            return `${hours}h ${minutes}m ${seconds}s`;
-          }
-
-          // Function to get request data from database
-          async function getRequestData() {
-            try {
-              const requestData = await Request.findOne()
-                .sort({ lastUpdated: -1 })
-                .exec();
-              return requestData
-                ? {
-                    totalRequests: requestData.totalRequests,
-                    todayRequests: requestData.todayRequests,
-                  }
-                : { totalRequests: 0, todayRequests: 0 };
-            } catch (error) {
-              console.error("Error fetching request data:", error);
-              return { totalRequests: 0, todayRequests: 0 };
-            }
-          }
-
+          const server = await Func.fetchJson(
+            config.API("arifzyn", "/system/server", {}, ""),
+          );
           const requestData = await getRequestData();
-          const runtime = getRuntime();
-          const serverUsage = `${(os.freemem() / (1024 * 1024)).toFixed(2)} MB`;
-          const features = "146"; // Update this with actual data if needed
-          const resetLimits = getResetCountdown();
-          const cpuSpeed = os.cpus()[0].speed;
+          const runtime = server.runtime;
+          const serverUsage = `${server.RAM.used} / ${server.RAM.total}`;
+          const cpuSpeed = server.ping;
+          const source = config.APIs["arifzyn"]
 
-          let botMenu =
-            `Hai @${m.sender.split("@")[0]}, \n\n` +
-            `</> *Info API System* </>\n` +
-            `- Runtime : ${runtime}\n` +
-            `- Server Usage : ${serverUsage}\n` +
-            `- Request Today : ${requestData.todayRequests}\n` +
-            `- Total Requests : ${requestData.totalRequests}\n` +
-            `- Features : ${features}\n` +
-            `- Reset Limits : ${resetLimits}\n` +
-            `- CPU Speed : ${cpuSpeed} MHz\n\n` +
-            `${readMore}` +
-            `</> *Commands* </>\n`;
+          const botMenu = `
+Hai @${m.sender.split("@")[0]},
 
-          for (const [category, cmds] of Object.entries(commands)) {
-            botMenu += `- *${category.charAt(0).toUpperCase() + category.slice(1)} Commands* -\n`;
-            cmds.forEach((name, index) => {
-              botMenu += `${index + 1}. !${name}\n`;
-            });
-            botMenu += "\n";
-          }
+</> *Info API System* </>
+- Runtime: ${runtime}
+- Server Usage: ${serverUsage}
+- Request Today: ${requestData.todayRequests}
+- Total Requests: ${requestData.totalRequests}
+- CPU Speed: ${cpuSpeed}
+- Source: ${source}
+${readMore}
+</> *Commands* </>
+${Object.entries(commands)
+  .map(
+    ([category, cmds], i) =>
+      `- *${category.charAt(0).toUpperCase() + category.slice(1)} Commands* -\n` +
+      cmds.map((name, idx) => `${idx + 1}. !${name}`).join("\n"),
+  )
+  .join("\n\n")}
 
-          botMenu += "Copyright © 2024 ArifzynAPI";
+Copyright © 2024 ArifzynAPI
+    `.trim();
 
-          await m.reply(botMenu.trim(), { mentions: [m.sender] });
+          await m.reply(botMenu, { mentions: [m.sender] });
         }
         break;
 
@@ -386,7 +338,7 @@ export default async function message(client, store, m) {
 </> Info Pengguna </>
 
 - Nama: ${user.username}
-- Apikey: ${user.apikey.substring(0, 2) + "*".repeat(user.apikey.length - 2)}
+- Apikey: ${user.apikey ? user.apikey.substring(0, 2) + "*".repeat(user.apikey.length - 2) : "-"}
 - Limit: ${user.limit}
 - Premium: ${user.premium ? "Ya" : "Tidak"}
 - Premium Time: ${new Date(user.premiumTime).toLocaleString()}

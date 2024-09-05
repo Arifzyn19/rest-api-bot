@@ -12,6 +12,23 @@ const config = {
     name: process.env.packname || "Default Packname",
     publisher: process.env.packPublish || "Default Publisher",
   },
+
+  APIs: {
+    arifzyn: "https://api.arifzyn.tech",
+  },
+  APIKeys: {
+    "https://api.arifzyn.tech": process.env.AR_KEY || "",
+  }, 
+  API: (name, path = "/", query = {}, apikeyqueryname) => {
+    const baseUrl = name in config.APIs ? config.APIs[name] : name;
+    const apiKey = apikeyqueryname ? config.APIKeys[baseUrl] : "";
+    const queryParams = new URLSearchParams({
+      ...query,
+      ...(apikeyqueryname && apiKey ? { [apikeyqueryname]: apiKey } : {}),
+    });
+
+    return baseUrl + path + (queryParams.toString() ? "?" + queryParams : "");
+  },
 };
 
 export default config;
